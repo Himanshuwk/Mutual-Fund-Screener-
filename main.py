@@ -46,8 +46,17 @@ def risk_mapper(category: str):
 @app.get("/amcs")
 def get_amcs():
     try:
-        data = mf.get_amcs()
-        return data
+        schemes = mf.get_scheme_codes()   # dict: {code: scheme_name}
+        amcs = set()
+
+        for name in schemes.values():
+            # Extract AMC name heuristically
+            # Example: "Axis Bluechip Fund - Direct Plan - Growth"
+            amc = name.split(" ")[0] + " Mutual Fund"
+            amcs.add(amc)
+
+        return sorted(list(amcs))
+
     except Exception as e:
         return {"error": str(e)}
 @app.get("/schemes/{amc_name}")
