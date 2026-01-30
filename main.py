@@ -46,17 +46,15 @@ def risk_mapper(category: str):
 @app.get("/amcs")
 def get_amcs():
     try:
-        schemes = mf.get_scheme_codes()   # dict: {code: scheme_name}
+        schemes = mf.get_scheme_codes()
         amcs = set()
 
         for name in schemes.values():
-            # Extract AMC name heuristically
-            # Example: "Axis Bluechip Fund - Direct Plan - Growth"
+            # Extract first word as AMC brand
             amc = name.split(" ")[0] + " Mutual Fund"
             amcs.add(amc)
 
         return sorted(list(amcs))
-
     except Exception as e:
         return {"error": str(e)}
 @app.get("/schemes/{amc_name}")
@@ -79,11 +77,17 @@ def screener(amc: str, min_roi: float = 10, years: int = 3):
     result = []
 
     try:
-        schemes = mf.get_amc_schemes(amc)
+        schemes = mf.get_scheme_codes()   # {code: name}
     except Exception as e:
-        return {"error": f"AMC fetch failed: {str(e)}"}
+        return {"error": f"Scheme list fetch failed: {str(e)}"}
 
     for code, name in schemes.items():
+
+        # ---- AMC FILTER ----
+        if amc.lower().split()[0] not in name.lower():
+            continue
+
+        # ---- ROI ----
         try:
             roi = calculate_roi(code, years)
         except:
@@ -92,6 +96,7 @@ def screener(amc: str, min_roi: float = 10, years: int = 3):
         if roi < min_roi:
             continue
 
+        # ---- DETAILS ----
         try:
             details = mf.get_scheme_details(code)
             category = details.get("category")
