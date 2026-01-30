@@ -76,23 +76,36 @@ def scheme_roi(scheme_code: int, years: int = 3):
 
 @app.get("/screener")
 def screener(amc: str, min_roi: float = 10, years: int = 3):
-    schemes = mf.get_amc_schemes(amc)
     result = []
+
+    try:
+        schemes = mf.get_amc_schemes(amc)
+    except Exception as e:
+        return {"error": f"AMC fetch failed: {str(e)}"}
 
     for code, name in schemes.items():
         try:
             roi = calculate_roi(code, years)
-            if roi >= min_roi:
-                details = mf.get_scheme_details(code)
-                result.append({
-                    "scheme_code": code,
-                    "scheme_name": name,
-                    "roi": roi,
-                    "category": details.get("category"),
-                    "risk": risk_mapper(details.get("category"))
-                })
         except:
             continue
 
-    return result
+        if roi < min_roi:
+            continue
 
+        try:
+            details = mf.get_scheme_details(code)
+            category = details.get("category")
+            risk = risk_mapper(category)
+        except:
+            category = None
+            risk = "Unknown"
+
+        result.append({
+            "scheme_code": code,
+            "scheme_name": name,
+            "roi": roi,
+            "category": category,
+            "risk": risk
+        })
+
+    return result
