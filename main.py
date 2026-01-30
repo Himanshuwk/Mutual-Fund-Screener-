@@ -45,8 +45,11 @@ def risk_mapper(category: str):
 
 @app.get("/amcs")
 def get_amcs():
-    return mf.get_amcs()
-
+    try:
+        data = mf.get_amcs()
+        return data
+    except Exception as e:
+        return {"error": str(e)}
 @app.get("/schemes/{amc_name}")
 def get_schemes(amc_name: str):
     return mf.get_amc_schemes(amc_name)
