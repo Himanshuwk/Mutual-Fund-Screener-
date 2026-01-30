@@ -84,11 +84,10 @@ def screener(amc: str, min_roi: float = 10, years: int = 3):
     for code, name in schemes.items():
 
         # ---- AMC FILTER ----
-        amc_key = amc.replace(" Mutual Fund", "").lower()
+        amc_key = amc.replace(" Mutual Fund", "").lower().strip()
 
-        if amc_key not in name.lower():
+        if not name.lower().startswith(amc_key):
             continue
-
         # ---- ROI ----
         try:
             roi = calculate_roi(code, years)
