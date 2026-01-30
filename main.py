@@ -4,6 +4,9 @@ import pandas as pd
 from datetime import datetime
 
 app = FastAPI(title="MF Screener API")
+@app.get("/")
+def health():
+    return {"status": "alive"}
 
 mf = Mftool()
 
