@@ -2,57 +2,38 @@ import streamlit as st
 import requests
 import pandas as pd
 
-API_URL = "https://mutual-fund-screener-2.onrender.com"
+API_URL = "https://YOUR-RENDER-URL.onrender.com"
 
-st.set_page_config(page_title="MF Screener", layout="wide")
-st.title("📊 Mutual Fund Screener (mftool based)")
+st.set_page_config(layout="wide")
+st.title("📊 Mutual Fund Screener")
 
-# -------------------------------
+# --------------------
 # AMC Selection
-# -------------------------------
-
-amcs = requests.get(f"{API_URL}/amcs").json()
+# --------------------
+amcs = ["-- Select AMC --"] + requests.get(f"{API_URL}/amcs").json()
 amc = st.selectbox("Select AMC", amcs)
 
-# -------------------------------
-# Screener Filters
-# -------------------------------
+if amc == "-- Select AMC --":
+    st.stop()
 
-col1, col2 = st.columns(2)
-min_roi = col1.slider("Minimum ROI (%)", 0, 50, 10)
-years = col2.selectbox("ROI Period (Years)", [1, 3, 5])
+# --------------------
+# Period Selection
+# --------------------
+period = st.selectbox("Return Period", ["1W", "1M"])
 
-# -------------------------------
+# --------------------
 # Run Screener
-# -------------------------------
-
+# --------------------
 if st.button("Run Screener"):
-    params = {
-        "amc": amc,
-        "min_roi": min_roi,
-        "years": years
-    }
-    data = requests.get(f"{API_URL}/screener", params=params).json()
+    resp = requests.get(
+        f"{API_URL}/screener",
+        params={"amc": amc, "period": period}
+    )
 
-    if data:
-        df = pd.DataFrame(data)
-        st.dataframe(df, use_container_width=True)
+    data = resp.json()
+
+    if not data:
+        st.warning("No schemes matched criteria")
     else:
-        st.warning("No schemes matched your criteria.")
-
-# -------------------------------
-# Scheme ROI Lookup
-# -------------------------------
-
-st.divider()
-st.subheader("🔍 Individual Scheme ROI")
-
-scheme_code = st.text_input("Enter Scheme Code")
-if scheme_code:
-    roi = requests.get(
-        f"{API_URL}/scheme/roi/{scheme_code}",
-        params={"years": 3}
-    ).json()
-
-    st.metric("3Y ROI (%)", roi["roi"])
-
+        df = pd.DataFrame(data).sort_values("return_percent", ascending=False)
+        st.dataframe(df, use_container_width=True)
