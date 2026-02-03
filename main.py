@@ -1,117 +1,96 @@
 from fastapi import FastAPI
-from mftool import Mftool
+import sqlite3
 import pandas as pd
-from datetime import datetime
 
 app = FastAPI(title="MF Screener API")
+
+DB_PATH = "db/nav_data.db"
+
+# --------------------
+# Utility
+# --------------------
+def get_df(query, params=()):
+    conn = sqlite3.connect(DB_PATH)
+    df = pd.read_sql(query, conn, params=params)
+    conn.close()
+    return df
+
+# --------------------
+# Health
+# --------------------
 @app.get("/")
 def health():
     return {"status": "alive"}
 
-mf = Mftool()
+# --------------------
+# AMC List
+# --------------------
+@app.get("/amcs")
+def get_amcs():
+    df = get_df("SELECT DISTINCT amc FROM nav_data")
+    return sorted(df["amc"].tolist())
 
-# -------------------------------
-# Utilities
-# -------------------------------
+# --------------------
+# Schemes by AMC
+# --------------------
+@app.get("/schemes/{amc}")
+def get_schemes(amc: str):
+    df = get_df(
+        "SELECT DISTINCT scheme_code, scheme_name FROM nav_data WHERE amc = ?",
+        (amc,)
+    )
+    return dict(zip(df["scheme_code"], df["scheme_name"]))
 
-def calculate_roi(scheme_code: int, years: int):
-    nav_data = mf.get_scheme_historical_nav(scheme_code)
-    df = pd.DataFrame(nav_data)
+# --------------------
+# Return Calculation
+# --------------------
+def calculate_return(scheme_code: int, days: int):
+    df = get_df(
+        "SELECT date, nav FROM nav_data WHERE scheme_code = ? ORDER BY date",
+        (scheme_code,)
+    )
 
-    df['date'] = pd.to_datetime(df['date'], dayfirst=True)
-    df['nav'] = df['nav'].astype(float)
-    df = df.sort_values("date")
+    if df.empty:
+        return None
 
-    end_nav = df.iloc[-1]['nav']
-    start_date = df['date'].max() - pd.DateOffset(years=years)
-    start_nav = df[df['date'] <= start_date].iloc[-1]['nav']
+    df["date"] = pd.to_datetime(df["date"])
+
+    latest = df.iloc[-1]
+    target_date = latest["date"] - pd.Timedelta(days=days)
+
+    past = df[df["date"] <= target_date]
+    if past.empty:
+        return None
+
+    start_nav = past.iloc[-1]["nav"]
+    end_nav = latest["nav"]
 
     return round(((end_nav / start_nav) - 1) * 100, 2)
 
-def risk_mapper(category: str):
-    if category is None:
-        return "Unknown"
-    category = category.lower()
-    if "equity" in category:
-        return "High"
-    elif "hybrid" in category:
-        return "Medium"
-    else:
-        return "Low"
-
-# -------------------------------
-# APIs
-# -------------------------------
-
-@app.get("/amcs")
-def get_amcs():
-    try:
-        schemes = mf.get_scheme_codes()
-        amcs = set()
-
-        for name in schemes.values():
-            # Extract first word as AMC brand
-            amc = name.split(" ")[0] + " Mutual Fund"
-            amcs.add(amc)
-
-        return sorted(list(amcs))
-    except Exception as e:
-        return {"error": str(e)}
-@app.get("/schemes/{amc_name}")
-def get_schemes(amc_name: str):
-    return mf.get_amc_schemes(amc_name)
-
-@app.get("/scheme/details/{scheme_code}")
-def scheme_details(scheme_code: int):
-    details = mf.get_scheme_details(scheme_code)
-    details["risk"] = risk_mapper(details.get("category"))
-    return details
-
-@app.get("/scheme/roi/{scheme_code}")
-def scheme_roi(scheme_code: int, years: int = 3):
-    roi = calculate_roi(scheme_code, years)
-    return {"scheme_code": scheme_code, "years": years, "roi": roi}
-
+# --------------------
+# Screener (1W / 1M)
+# --------------------
 @app.get("/screener")
-def screener(amc: str, min_roi: float = 10, years: int = 3):
+def screener(amc: str, period: str = "1W"):
+    days_map = {"1W": 7, "1M": 30}
+    days = days_map.get(period, 7)
+
+    schemes = get_df(
+        "SELECT DISTINCT scheme_code, scheme_name FROM nav_data WHERE amc = ?",
+        (amc,)
+    )
+
     result = []
 
-    try:
-        schemes = mf.get_scheme_codes()   # {code: name}
-    except Exception as e:
-        return {"error": f"Scheme list fetch failed: {str(e)}"}
-
-    for code, name in schemes.items():
-
-        # ---- AMC FILTER ----
-        amc_key = amc.replace(" Mutual Fund", "").lower().strip()
-
-        if not name.lower().startswith(amc_key):
+    for _, row in schemes.iterrows():
+        ret = calculate_return(row["scheme_code"], days)
+        if ret is None:
             continue
-        # ---- ROI ----
-        try:
-            roi = calculate_roi(code, years)
-        except:
-            continue
-
-        if roi < min_roi:
-            continue
-
-        # ---- DETAILS ----
-        try:
-            details = mf.get_scheme_details(code)
-            category = details.get("category")
-            risk = risk_mapper(category)
-        except:
-            category = None
-            risk = "Unknown"
 
         result.append({
-            "scheme_code": code,
-            "scheme_name": name,
-            "roi": roi,
-            "category": category,
-            "risk": risk
+            "scheme_code": int(row["scheme_code"]),
+            "scheme_name": row["scheme_name"],
+            "return_percent": ret
         })
 
     return result
