@@ -1,1 +1,9 @@
+# Ignore large raw data
+data/nav_history_5y.csv
 
+# Ignore SQLite DB created locally
+db/nav_data.db
+
+# Ignore Python cache
+__pycache__/
+*.pyc
