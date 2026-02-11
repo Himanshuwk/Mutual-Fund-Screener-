@@ -4,7 +4,7 @@ import os
 
 os.makedirs("db", exist_ok=True)
 
-csv_path = "data/nav_history_5y.csv"
+csv_path = "data/sample_nav.csv"
 db_path = "db/nav_data.db"
 
 chunk_size = 500_000
