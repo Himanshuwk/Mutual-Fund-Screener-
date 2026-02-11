@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 import pandas as pd
 
-API_URL = "https://YOUR-RENDER-URL.onrender.com"
+API_URL = "https://mutual-fund-screener-1.onrender.com"
 
 st.set_page_config(layout="wide")
 st.title("📊 Mutual Fund Screener")
