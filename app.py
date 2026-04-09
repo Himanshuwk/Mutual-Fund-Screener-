@@ -2,46 +2,35 @@ import streamlit as st
 import requests
 import pandas as pd
 
-# --------------------
-# CONFIG
-# --------------------
 API_URL = "https://mutual-fund-screener-1.onrender.com"
 
-st.set_page_config(layout="wide")
 st.title("📊 Mutual Fund Screener")
 
+
 # --------------------
-# SAFE API CALL FUNCTION
+# Safe API call
 # --------------------
-def safe_get_json(url, params=None):
+def safe_get(url, params=None):
     try:
-        resp = requests.get(url, params=params, timeout=20)
-        resp.raise_for_status()
-        return resp.json()
-    except Exception:
+        r = requests.get(url, params=params, timeout=20)
+        r.raise_for_status()
+        return r.json()
+    except:
         return None
 
 
 # --------------------
-# AMC Selection
+# Fund house dropdown
 # --------------------
-amc_list = safe_get_json(f"{API_URL}/amcs")
+fundhouses = safe_get(f"{API_URL}/fundhouses")
 
-if amc_list is None:
-    st.warning("⏳ Backend is waking up... please wait 20–30 seconds and refresh.")
+if fundhouses is None:
+    st.warning("Backend waking up... refresh in few seconds")
     st.stop()
 
-amcs = ["-- Select AMC --"] + amc_list
-amc = st.selectbox("Select AMC", amcs)
+fundhouses = ["All"] + fundhouses
 
-if amc == "-- Select AMC --":
-    st.stop()
-
-
-# --------------------
-# Period Selection
-# --------------------
-period = st.selectbox("Return Period", ["1W", "1M"])
+selected = st.selectbox("Select Fund House", fundhouses)
 
 
 # --------------------
@@ -49,17 +38,16 @@ period = st.selectbox("Return Period", ["1W", "1M"])
 # --------------------
 if st.button("Run Screener"):
 
-    data = safe_get_json(
-        f"{API_URL}/screener",
-        params={"amc": amc, "period": period}
-    )
+    params = {}
 
-    if data is None:
-        st.error("⚠️ Could not fetch data from backend. Try again in a few seconds.")
-        st.stop()
+    if selected != "All":
+        params["fund_house"] = selected
+
+    data = safe_get(f"{API_URL}/screener", params)
 
     if not data:
-        st.warning("No schemes matched criteria.")
+        st.warning("No data available")
     else:
-        df = pd.DataFrame(data).sort_values("return_percent", ascending=False)
+        df = pd.DataFrame(data)
+        df = df.sort_values("cagr_5y_pct", ascending=False)
         st.dataframe(df, use_container_width=True)
