@@ -1,8 +1,5 @@
 fastapi
 uvicorn
-streamlit
-mftool
 pandas
+streamlit
 requests
-deprecated
-
