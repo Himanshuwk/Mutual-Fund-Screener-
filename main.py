@@ -3,8 +3,9 @@ import pandas as pd
 
 app = FastAPI()
 
-# Load static CSV once
+# Load CSV once
 df = pd.read_csv("data/final_fund_data.csv")
+
 
 # --------------------
 # Health check
@@ -33,8 +34,19 @@ def screener(fund_house: str = None):
     if fund_house:
         data = data[data["fund_house"] == fund_house]
 
-    result = data[[
-        "scheme_code",
+    result = data[
+        [
+            "scheme_code",
+            "scheme_name",
+            "category",
+            "return_3m_pct",
+            "cagr_5y_pct",
+            "sharpe_ratio",
+            "fund_house"
+        ]
+    ].dropna()
+
+    return result.to_dict(orient="records")        "scheme_code",
         "scheme_name",
         "category",
         "return_3m_pct",
